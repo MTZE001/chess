@@ -12,11 +12,13 @@
   .row{display:flex; align-items:center; gap:12px; margin-top:8px}
   .btn{margin-top:14px; padding:10px 14px; border-radius:8px; border:none; cursor:pointer; background:linear-gradient(90deg,#17a3ff,#6ee7ff); color:#002; font-weight:600}
   .note{font-size:13px; color:#9fbfd8; margin-top:10px}
+  .switch{display:inline-flex;align-items:center;gap:8px}
+  .switch input{width:18px;height:18px}
 </style>
 </head>
 <body>
   <div class="box">
-    <h1>ตั้งค่าสีตาราง</h1>
+    <h1>ตั้งค่าสีตาราง & ฟีเจอร์</h1>
     <label>สีช่องสว่าง</label>
     <div class="row"><input id="light" type="color"><div class="note">สีของช่องสว่าง</div></div>
 
@@ -25,6 +27,15 @@
 
     <label>สีขอบเริ่มต้นของช่อง</label>
     <div class="row"><input id="border" type="color"><div class="note">สีขอบเริ่มต้น (แสดงผลเป็นขอบบาง)</div></div>
+
+    <label>ฟีเจอร์พิเศษ</label>
+    <div class="row switch">
+      <input id="enemyStars" type="checkbox">
+      <div>
+        <div style="font-weight:600">เปลี่ยนหมากศัตรู</div>
+        <div class="note">เมื่อเปิด: หมากฝ่ายศัตรูจะแสดงเป็น ●</div>
+      </div>
+    </div>
 
     <button class="btn" onclick="save()">บันทึก & กลับ</button>
     <div class="note">* บันทึกจะถูกใช้เมื่อกลับไปหน้าเล่น</div>
@@ -35,10 +46,13 @@ document.getElementById('light').value = localStorage.getItem('boardLight') || '
 document.getElementById('dark').value  = localStorage.getItem('boardDark')  || '#4a4a4a';
 document.getElementById('border').value= localStorage.getItem('boardBorder')|| '#000000';
 
+document.getElementById('enemyStars').checked = localStorage.getItem('enemyStars') === '1';
+
 function save(){
   localStorage.setItem('boardLight', document.getElementById('light').value);
   localStorage.setItem('boardDark', document.getElementById('dark').value);
   localStorage.setItem('boardBorder', document.getElementById('border').value);
+  localStorage.setItem('enemyStars', document.getElementById('enemyStars').checked ? '1' : '0');
   location.href = 'play.html';
 }
 </script>
