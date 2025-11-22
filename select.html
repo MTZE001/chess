@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8"/>
+<title>Chess Tutor — Select Piece</title>
+<style>
+  :root{
+    --bg:#071026; --card:#0b1220; --accent:#19b5ff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; font-family:Inter, Arial, sans-serif;
+    background: linear-gradient(180deg,#041028,#071017);
+    color:#e6f3ff; display:flex; align-items:center; justify-content:center; padding:32px;
+  }
+  .wrap{width:380px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));
+        border-radius:14px; padding:18px; box-shadow:0 10px 30px rgba(2,8,20,0.6); border:1px solid rgba(255,255,255,0.02)}
+  h1{margin:0 0 8px; font-size:20px}
+  p{color:#bcd3e8; margin:0 0 14px; font-size:13px}
+  .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px}
+  button.piece{
+    background:#172033; border:none; color:#e8f6ff; padding:12px; border-radius:10px;
+    font-size:16px; cursor:pointer; display:flex; gap:10px; align-items:center; justify-content:center;
+  }
+  .controls{display:flex; gap:8px; margin-top:12px}
+  .btn-secondary{background:transparent; border:1px solid rgba(255,255,255,0.04); color:#cfeaff; padding:8px 10px; border-radius:8px; cursor:pointer}
+  .btn-primary{background:linear-gradient(90deg,#17a3ff,#6ee7ff); color:#002; padding:8px 10px; border-radius:8px; border:none; cursor:pointer; font-weight:600}
+  .note{font-size:13px; color:#9fbfd8; margin-top:10px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>เลือกชนิดหมากที่จะฝึก</h1>
+    <p>หมากของคุณเป็นตัวเดียว (ระบบไม่อนุญาตให้ใช้ Pawn เป็นตัวผู้เล่น)</p>
+
+    <div class="grid">
+      <button class="piece" onclick="choose('king')">♔ King</button>
+      <button class="piece" onclick="choose('queen')">♕ Queen</button>
+      <button class="piece" onclick="choose('rook')">♖ Rook</button>
+      <button class="piece" onclick="choose('bishop')">♗ Bishop</button>
+      <button class="piece" onclick="choose('knight')">♘ Knight</button>
+      <button class="piece" onclick="choose('pawn')">♙ Pawn</button>
+    </div>
+
+    <div class="controls">
+      <button class="btn-secondary" onclick="location.href='settings.html'">⚙️ ตั้งค่า</button>
+      <button class="btn-primary" onclick="start()">▶ เริ่มเล่น</button>
+    </div>
+    <div class="note" id="note">เลือกหมากแล้วกด เริ่มเล่น</div>
+  </div>
+
+<script>
+function choose(t){
+  if(t === 'pawn'){
+    // Pawn ไม่อนุญาต — เปลี่ยนเป็น knight อัตโนมัติ
+    localStorage.setItem('selectedPiece','knight');
+    document.getElementById('note').textContent = 'Pawn ไม่อนุญาต — เลือกเป็น Knight อัตโนมัติ';
+    return;
+  }
+  localStorage.setItem('selectedPiece', t);
+  document.getElementById('note').textContent = 'ตั้งค่า: ' + t.toUpperCase() + ' — กด เริ่มเล่น';
+}
+function start(){
+  if(!localStorage.getItem('selectedPiece')) localStorage.setItem('selectedPiece','knight');
+  location.href='play.html';
+}
+</script>
+</body>
+</html>
