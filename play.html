@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8"/>
+<title>Chess Tutor — Play</title>
+<style>
+  :root{ --muted:#9fbfd8; --accent:#19b5ff; }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; font-family:Inter, Arial, sans-serif;
+    background: linear-gradient(180deg,#041028,#071017);
+    color:#e6f3ff; display:flex; flex-direction:column; align-items:center; gap:16px; padding:22px;
+  }
+  .topbar{width:100%; max-width:980px; display:flex; justify-content:space-between; align-items:center}
+  .card{background:rgba(11,18,32,0.9); padding:10px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.02)}
+  button{padding:8px 12px; border-radius:8px; border:none; cursor:pointer}
+  #boardWrap{display:flex; gap:14px; align-items:flex-start; max-width:980px; width:100%;}
+  /* กระดาน: ขอบเล็กลง, hover เบาลง */
+  #board{display:grid; grid-template-columns:repeat(8,64px); grid-template-rows:repeat(8,64px); border-radius:10px; overflow:hidden; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02)}
+  .tile{width:64px; height:64px; display:flex; align-items:center; justify-content:center; font-size:30px; user-select:none;
+        transition: transform .10s ease, border-color .12s ease, box-shadow .12s ease, background .12s ease;
+        border:1px solid transparent; box-sizing:border-box; cursor:pointer}
+  .tile:hover{transform:translateY(-2px)}
+  .pieceIcon{filter:drop-shadow(0 3px 6px rgba(0,0,0,0.55)); font-size:30px}
+  .hud{display:flex; flex-direction:column; gap:10px; min-width:220px}
+  .stat{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04)); padding:10px; border-radius:8px}
+  .hint{color:var(--muted); font-size:13px}
+  /* ไฮไลต์ขอบ (เบา) */
+  .cyan{box-shadow:0 0 8px 2px rgba(25,181,255,0.18); border-color:cyan !important}
+  .captured-fx{position:fixed; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center; font-size:28px; color:#7ff0ff; opacity:0; transition:opacity .35s}
+  .captured-fx.show{opacity:1}
+</style>
+</head>
+<body>
+  <div class="topbar" style="max-width:980px; width:100%">
+    <div class="card">
+      <strong>Chess Tutor — ไล่จับหมากดำ</strong>
+      <div class="hint" style="margin-top:6px; font-size:13px">เป้าหมาย: กินหมากดำทั้งหมด → เกมจะสุ่มใหม่เมื่อชนะ</div>
+    </div>
+
+    <div style="display:flex; gap:8px;">
+      <button onclick="location.href='select.html'">🔁 เลือกหมาก</button>
+      <button onclick="location.href='settings.html'">⚙️ ตั้งค่า</button>
+      <button onclick="resetGame()" style="background:linear-gradient(90deg,#ff9a19,#ffd86b);">รีเซ็ตเกม</button>
+    </div>
+  </div>
+
+  <div id="boardWrap" style="max-width:980px; width:100%">
+    <div id="board" class="card" role="grid" aria-label="chess board"></div>
+
+    <div class="hud">
+      <div class="stat"><strong>หมากของคุณ:</strong> <span id="myType"></span></div>
+      <div class="stat"><strong>หมากดำเหลือ:</strong> <span id="enemiesLeft">0</span></div>
+      <div class="stat"><strong>คำแนะนำ</strong><div class="hint" id="hint">คลิกตัวหมากเพื่อเลือก → ไฮไลต์ช่องที่เดินได้ (ขอบฟ้า) → คลิกช่องเพื่อเดินหรือกิน</div></div>
+    </div>
+  </div>
+
+  <div id="capturedFx" class="captured-fx"> </div>
+
+<script>
+// ไอคอน + โหลดชนิดหมากผู้เล่น (ไม่อนุญาต pawn)
+const icons = { king:"♔", queen:"♕", rook:"♖", bishop:"♗", knight:"♘", pawn:"♙" };
+let myType = localStorage.getItem('selectedPiece') || 'knight';
+if(myType === 'pawn'){ myType = 'knight'; localStorage.setItem('selectedPiece', myType); }
+document.getElementById('myType').textContent = myType.toUpperCase();
+
+// สีจาก settings
+let lightColor = localStorage.getItem('boardLight') || '#f0f0f0';
+let darkColor  = localStorage.getItem('boardDark')  || '#4a4a4a';
+let defaultBorder = localStorage.getItem('boardBorder') || 'transparent';
+
+// สถานะเกม
+let pieces = [];               // {x,y,type,owner:'player'|'enemy'}
+let selectedIndex = null;
+let highlighted = [];
+const boardEl = document.getElementById('board');
+const enemiesLeftEl = document.getElementById('enemiesLeft');
+const capturedFx = document.getElementById('capturedFx');
+
+// ฟังก์ชันช่วย
+function tileIndex(x,y){ return pieces.findIndex(p=>p.x===x && p.y===y); }
+function pathClear(p, tx, ty){
+  const dx = tx - p.x, dy = ty - p.y;
+  const sx = Math.sign(dx), sy = Math.sign(dy);
+  let cx = p.x + sx, cy = p.y + sy;
+  while(cx !== tx || cy !== ty){
+    if(tileIndex(cx,cy) !== -1) return false;
+    cx += sx; cy += sy;
+  }
+  return true;
+}
+
+// กฎการเดิน
+function validMove(p, x, y){
+  if(x<0||x>7||y<0||y>7) return false;
+  if(p.x===x && p.y===y) return false;
+  const dx = x - p.x, dy = y - p.y;
+  switch(p.type){
+    case 'king': return Math.max(Math.abs(dx),Math.abs(dy))===1;
+    case 'queen': return (dx===0||dy===0||Math.abs(dx)===Math.abs(dy)) && pathClear(p,x,y);
+    case 'rook': return (dx===0||dy===0) && pathClear(p,x,y);
+    case 'bishop':
+      // ต้องเป็นการเดินแนวทแยง และเส้นทางว่าง และปลายทางต้องเป็นสีเดียวกับบิชอป (โดยหลักแล้ว diagonal จะอยู่สีเดียวกันอยู่แล้ว)
+      if(Math.abs(dx)!==Math.abs(dy)) return false;
+      // (ซ้ำกัน) บิชอปจะอยู่บนสีเดียวกันเสมอเมื่อเดินทแยง แต่เรารักษาเงื่อนไขเพื่อความชัดเจน:
+      if(((p.x + p.y) % 2) !== ((x + y) % 2)) return false;
+      return pathClear(p,x,y);
+    case 'knight': return (Math.abs(dx)===2&&Math.abs(dy)===1)||(Math.abs(dx)===1&&Math.abs(dy)===2);
+    case 'pawn': return dx===0 && dy===-1;
+    default: return false;
+  }
+}
+
+// สุ่มศัตรู โดยถ้าเป็น bishop ให้เกิดบนสีเดียวกับ player (เพื่อให้จับได้)
+function spawnEnemies(){
+  const count = 4 + Math.floor(Math.random()*5); // 4..8
+  const possible = ['pawn','rook','bishop','knight','queen'];
+  const player = pieces.find(p=>p.owner==='player');
+  const playerParity = (player.x + player.y) % 2;
+
+  let placed = 0, attempts = 0;
+  while(placed < count && attempts < 600){
+    attempts++;
+    let x = Math.floor(Math.random()*8);
+    let y = Math.floor(Math.random()*8);
+    if(pieces.some(p=>p.x===x && p.y===y)) continue;
+    let t = possible[Math.floor(Math.random()*possible.length)];
+
+    if(t === 'bishop'){
+      // หาตำแหน่งที่มี parity เดียวกับ player
+      if(((x+y) % 2) !== playerParity){
+        // try to find one matching parity
+        let found = false;
+        for(let r=0; r<60; r++){
+          const nx = Math.floor(Math.random()*8);
+          const ny = Math.floor(Math.random()*8);
+          if(pieces.some(p=>p.x===nx && p.y===ny)) continue;
+          if(((nx+ny)%2) === playerParity){
+            x = nx; y = ny;
+            found = true; break;
+          }
+        }
+        if(!found){
+          // fallback — convert to pawn to avoid blocking
+          t = 'pawn';
+        }
+      }
+    }
+
+    if(pieces.some(p=>p.x===x && p.y===y)) continue;
+    pieces.push({x,y,type:t, owner:'enemy'});
+    placed++;
+  }
+}
+
+// เริ่มเกม
+function initGame(){
+  pieces = [];
+  // วางผู้เล่นตรงกลาง
+  pieces.push({x:4, y:4, type: myType, owner:'player'});
+  spawnEnemies();
+  selectedIndex = null;
+  highlighted = [];
+  draw();
+  updateHUD();
+}
+
+// วาดกระดาน + ชิ้น
+function draw(){
+  boardEl.innerHTML = '';
+  for(let y=0;y<8;y++){
+    for(let x=0;x<8;x++){
+      const t = document.createElement('div');
+      t.className = 'tile';
+      t.dataset.x = x; t.dataset.y = y;
+      t.style.background = ((x+y)%2===0) ? (localStorage.getItem('boardLight') || '#f0f0f0') : (localStorage.getItem('boardDark') || '#4a4a4a');
+      t.style.borderColor = localStorage.getItem('boardBorder') || 'transparent';
+      t.style.borderWidth = '1px'; // ขอบบางลง
+
+      const idx = tileIndex(x,y);
+      if(idx !== -1){
+        const p = pieces[idx];
+        const span = document.createElement('div');
+        span.className = 'pieceIcon';
+        span.textContent = icons[p.type];
+        span.style.transform = p.owner==='enemy' ? 'scale(.95)' : 'scale(1.05)';
+        span.style.opacity = p.owner==='enemy' ? '0.95' : '1';
+        if(p.owner === 'enemy') span.style.color = '#0a0a0a';
+        t.appendChild(span);
+      }
+      t.addEventListener('click', ()=>onTileClick(x,y));
+      boardEl.appendChild(t);
+    }
+  }
+}
+
+// ไฮไลต์
+function showHighlights(){
+  clearHighlights();
+  if(selectedIndex === null) return;
+  const p = pieces[selectedIndex];
+  const tiles = boardEl.children;
+  for(let i=0;i<tiles.length;i++){
+    const x = i%8, y = Math.floor(i/8);
+    if(validMove(p,x,y)){
+      const t = tiles[i];
+      t.classList.add('cyan');
+      highlighted.push(t);
+    }
+  }
+}
+function clearHighlights(){ highlighted.forEach(t=>t.classList.remove('cyan')); highlighted = []; }
+
+function showCaptureFx(){ capturedFx.classList.add('show'); setTimeout(()=>capturedFx.classList.remove('show'),600); }
+
+// คลิกบนช่อง
+function onTileClick(x,y){
+  const found = tileIndex(x,y);
+
+  // ถ้าคลิกชิ้นผู้เล่น -> เลือก/ยกเลิก
+  if(found !== -1 && pieces[found].owner === 'player'){
+    if(selectedIndex === found){ selectedIndex = null; clearHighlights(); return; }
+    selectedIndex = found; showHighlights(); return;
+  }
+
+  // ถ้าคลิกชิ้นศัตรูขณะที่มีการเลือกผู้เล่น และเป็นการเดินที่ถูกต้อง -> จับ
+  if(found !== -1 && pieces[found].owner === 'enemy' && selectedIndex !== null){
+    const playerObj = pieces[selectedIndex];
+    if(validMove(playerObj, x, y)){
+      // ลบศัตรูก่อน (หา index ใหม่ เพราะ array อาจเปลี่ยน)
+      const enemyIdx = tileIndex(x,y);
+      if(enemyIdx !== -1 && pieces[enemyIdx].owner === 'enemy'){
+        pieces.splice(enemyIdx, 1);
+        // ย้ายผู้เล่น (playerObj อ้างอิงยังคงถูกต้อง)
+        playerObj.x = x; playerObj.y = y;
+        selectedIndex = null; clearHighlights();
+        showCaptureFx();
+        draw(); updateHUD(); checkWin();
+      }
+    }
+    return;
+  }
+
+  // คลิกช่องว่าง: ถ้ามีการเลือกและเป็นการเดินที่ถูกต้อง -> ย้าย
+  if(found === -1 && selectedIndex !== null){
+    const p = pieces[selectedIndex];
+    if(validMove(p, x, y)){
+      p.x = x; p.y = y;
+      selectedIndex = null; clearHighlights();
+      draw(); updateHUD(); checkWin();
+    }
+    return;
+  }
+
+  // คลิกชิ้นศัตรูขณะที่ไม่ได้เลือก -> ไม่ทำอะไร
+}
+
+// อัปเดต HUD
+function updateHUD(){
+  const enemies = pieces.filter(p=>p.owner==='enemy').length;
+  enemiesLeftEl.textContent = enemies;
+}
+
+// เช็กชนะ
+function checkWin(){
+  const remaining = pieces.filter(p=>p.owner==='enemy').length;
+  updateHUD();
+  if(remaining === 0){
+    document.getElementById('hint').textContent = 'สำเร็จ! กินหมากดำหมดแล้ว — กำลังสุ่มใหม่...';
+    setTimeout(()=>{ initGame(); document.getElementById('hint').textContent = 'สุ่มใหม่แล้ว! ไล่จับต่อเลย'; }, 900);
+  }
+}
+
+function resetGame(){ initGame(); }
+
+// เริ่มเกม
+initGame();
+
+// ถ้าไปแก้ค่า settings กลับมา ให้รีเฟรชสี/กระดาน
+window.addEventListener('focus', ()=>{
+  draw(); updateHUD();
+});
+</script>
+</body>
+</html>
