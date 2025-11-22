@@ -38,10 +38,13 @@ button{
 }
 #boardWrap{
   display:flex;
+  justify-content:center; /* ทำให้กระดานอยู่กลาง */
   gap:14px;
   align-items:flex-start;
   max-width:980px;
   width:100%;
+  box-sizing:border-box;
+  margin:0 auto;
 }
 #board{
   display:grid;
@@ -49,7 +52,9 @@ button{
   grid-template-rows:repeat(8,64px);
   border-radius:10px;
   overflow:hidden;
-  box-shadow:inset 0 0 0  3px rgba(255,255,255,0.02);
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,0.02);
+  width:512px; /* 8*64px */
+  height:512px;
 }
 .tile{
   position: relative;
@@ -71,6 +76,11 @@ button{
   font-size:60px;
   user-select:none;
 }
+
+.starIcon{
+  font-size:56px;
+  line-height:1;
+}
 .tile.cyan::after{
   content: '';
   position: absolute;
@@ -82,7 +92,7 @@ button{
   z-index: 3;
 }
 .tile.cyan::before{
-  content:'';
+  content:''; 
   position:absolute;
   inset: -6px;
   pointer-events:none;
@@ -107,7 +117,7 @@ button{
 </style>
 </head>
 <body>
-<div class="topbar" style="max-width:980px;width:100%">
+<div class="topbar">
   <div class="card"><strong>Chess Tutor — ไล่จับหมากดำ</strong>
     <div style="margin-top:6px;font-size:13px;color:#9fbfd8;">เป้าหมาย: กินหมากดำทั้งหมด → เกมจะสุ่มใหม่เมื่อชนะ</div>
   </div>
@@ -119,7 +129,7 @@ button{
   </div>
 </div>
 
-<div id="boardWrap" style="max-width:980px;width:100%">
+<div id="boardWrap">
   <div id="board" class="card"></div>
   <div class="hud">
     <div class="stat"><strong>หมากของคุณ:</strong> <span id="myType"></span></div>
@@ -215,7 +225,12 @@ function initGame(){
   draw(); updateHUD();
 }
 
+function isEnemyStarEnabled(){
+  return localStorage.getItem('enemyStars') === '1';
+}
+
 function draw(){
+  const enemyStarEnabled = isEnemyStarEnabled();
   boardEl.innerHTML='';
   for(let y=0;y<8;y++){
     for(let x=0;x<8;x++){
@@ -228,8 +243,15 @@ function draw(){
         const p=pieces[idx];
         const span=document.createElement('div');
         span.className='pieceIcon';
-        span.textContent=icons[p.type];
-        span.style.color=p.owner==='enemy'?'#0a0a0a':'#fff';
+        // ถ้าเปิดใช้งาน star ให้แสดงดาวสำหรับฝ่ายศัตรู
+        if(p.owner==='enemy' && enemyStarEnabled){
+          span.textContent='●';
+          span.classList.add('starIcon');
+          span.style.color='#ffd86b';
+        } else {
+          span.textContent=icons[p.type] || '?';
+          span.style.color=p.owner==='enemy'?'#0a0a0a':'#fff';
+        }
         t.appendChild(span);
       }
       t.addEventListener('click',()=>onTileClick(x,y));
@@ -288,6 +310,18 @@ function showToast(text,ms=1600){
   const d=document.createElement('div'); d.className='toast'; d.textContent=text; document.body.appendChild(d);
   setTimeout(()=>{ d.style.transition='opacity 300ms'; d.style.opacity='0'; setTimeout(()=>d.remove(),300); },ms);
 }
+
+// ฟังการเปลี่ยนแปลงของ localStorage จากแท็บอื่น (update แบบเรียลไทม์)
+window.addEventListener('storage', (e)=>{
+  if(e.key === 'enemyStars' || e.key === 'boardLight' || e.key === 'boardDark' || e.key === 'boardBorder'){
+    // รีโหลดค่าเฉพาะที่ต้องการ
+    lightColor=localStorage.getItem('boardLight')||lightColor;
+    darkColor=localStorage.getItem('boardDark')||darkColor;
+    defaultBorder=localStorage.getItem('boardBorder')||defaultBorder;
+    draw();
+    updateHUD();
+  }
+});
 
 initGame();
 </script>
