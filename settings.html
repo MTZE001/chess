@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8"/>
+<title>Settings</title>
+<style>
+  body{font-family:Inter, Arial; background:linear-gradient(180deg,#071026,#02060a); color:#e6f3ff; display:flex; align-items:center; justify-content:center; height:100vh; margin:0}
+  .box{width:420px; padding:16px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.05)); box-shadow:0 12px 40px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.03)}
+  h1{margin:0 0 8px}
+  label{display:block; font-size:13px; color:#bfe7ff; margin-top:8px}
+  input[type=color]{width:60px; height:38px; border-radius:8px; border:none; padding:4px; cursor:pointer}
+  .row{display:flex; align-items:center; gap:12px; margin-top:8px}
+  .btn{margin-top:14px; padding:10px 14px; border-radius:8px; border:none; cursor:pointer; background:linear-gradient(90deg,#17a3ff,#6ee7ff); color:#002; font-weight:600}
+  .note{font-size:13px; color:#9fbfd8; margin-top:10px}
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>ตั้งค่าสีตาราง</h1>
+    <label>สีช่องสว่าง</label>
+    <div class="row"><input id="light" type="color"><div class="note">สีของช่องสว่าง</div></div>
+
+    <label>สีช่องมืด</label>
+    <div class="row"><input id="dark" type="color"><div class="note">สีของช่องมืด</div></div>
+
+    <label>สีขอบเริ่มต้นของช่อง</label>
+    <div class="row"><input id="border" type="color"><div class="note">สีขอบเริ่มต้น (แสดงผลเป็นขอบบาง)</div></div>
+
+    <button class="btn" onclick="save()">บันทึก & กลับ</button>
+    <div class="note">* บันทึกจะถูกใช้เมื่อกลับไปหน้าเล่น</div>
+  </div>
+
+<script>
+document.getElementById('light').value = localStorage.getItem('boardLight') || '#f0f0f0';
+document.getElementById('dark').value  = localStorage.getItem('boardDark')  || '#4a4a4a';
+document.getElementById('border').value= localStorage.getItem('boardBorder')|| '#000000';
+
+function save(){
+  localStorage.setItem('boardLight', document.getElementById('light').value);
+  localStorage.setItem('boardDark', document.getElementById('dark').value);
+  localStorage.setItem('boardBorder', document.getElementById('border').value);
+  location.href = 'play.html';
+}
+</script>
+</body>
+</html>
