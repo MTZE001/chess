@@ -51,10 +51,8 @@ button{
   overflow:hidden;
   box-shadow:inset 0 0 0  3px rgba(255,255,255,0.02);
 }
-
-/* --- Tile & highlight --- */
 .tile{
-  position: relative;           /* สำหรับ pseudo-element */
+  position: relative;
   width:64px;
   height:64px;
   display:flex;
@@ -62,18 +60,17 @@ button{
   justify-content:center;
   font-size:30px;
   user-select:none;
-  border:1px solid transparent; /* ลดขอบ */
+  border:1px solid transparent;
   box-sizing:border-box;
   cursor:pointer;
   background-clip: padding-box;
 }
 .pieceIcon{
   position: relative;
-  z-index: 1; /* ต่ำกว่า highlight */
-  font-size:30px;
+  z-index: 1;
+  font-size:60px;
   user-select:none;
 }
-/* ไฮไลต์สีฟ้า */
 .tile.cyan::after{
   content: '';
   position: absolute;
@@ -82,9 +79,8 @@ button{
   box-sizing: border-box;
   border: 4px solid cyan;
   border-radius: 0;
-  z-index: 3; /* สูงสุดใน tile */
+  z-index: 3;
 }
-/* อ่อน ๆ glow */
 .tile.cyan::before{
   content:'';
   position:absolute;
@@ -93,7 +89,6 @@ button{
   box-shadow: 0 0 10px 4px rgba(25,181,255,0.12);
   z-index:2;
 }
-
 .hud{
   display:flex;
   flex-direction:column;
@@ -104,6 +99,10 @@ button{
   background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));
   padding:10px;
   border-radius:8px;
+}
+.toast{
+  position:fixed; left:50%; transform:translateX(-50%); bottom:40px;
+  background:rgba(10,20,30,0.95); padding:10px 14px; border-radius:8px; color:#e6f3ff; box-shadow:0 6px 18px rgba(0,0,0,0.6);
 }
 </style>
 </head>
@@ -116,6 +115,7 @@ button{
     <button onclick="location.href='select.html'">🔁 เลือกหมาก</button>
     <button onclick="location.href='settings.html'">⚙️ ตั้งค่า</button>
     <button onclick="resetGame()" style="background:linear-gradient(90deg,#ff9a19,#ffd86b);">รีเซ็ตเกม</button>
+    <button onclick="clearStats()" style="background:linear-gradient(90deg,#ff6b6b,#ff9a9e);">ล้างสถิติ</button>
   </div>
 </div>
 
@@ -124,29 +124,42 @@ button{
   <div class="hud">
     <div class="stat"><strong>หมากของคุณ:</strong> <span id="myType"></span></div>
     <div class="stat"><strong>หมากดำเหลือ:</strong> <span id="enemiesLeft">0</span></div>
+    <div class="stat"><strong>ชนะทั้งหมด:</strong> <span id="winsCount">0</span></div>
+    <div class="stat"><strong>เวลาเฉลี่ยต่อด่าน (วินาที):</strong> <span id="avgTime">0</span></div>
     <div class="stat"><strong>คำแนะนำ</strong><div style="color:#9fbfd8;font-size:13px;">คลิกตัวหมากเพื่อเลือก → ไฮไลต์ช่องที่เดินได้ (ขอบฟ้า) → คลิกช่องเพื่อเดินหรือกิน</div></div>
   </div>
 </div>
 
 <script>
-// ไอคอน + โหลดชนิดหมากผู้เล่น
-const icons = { king:"♔", queen:"♕", rook:"♖", bishop:"♗", knight:"♘", pawn:"♙" };
+const icons = { king:"♚", queen:"♛", rook:"♜", bishop:"♝", knight:"♞", pawn:"♟" };
 let myType = localStorage.getItem('selectedPiece') || 'knight';
 if(myType==='pawn'){ myType='knight'; localStorage.setItem('selectedPiece',myType);}
 document.getElementById('myType').textContent=myType.toUpperCase();
 
-// สีจาก settings
 let lightColor=localStorage.getItem('boardLight')||'#f0f0f0';
 let darkColor=localStorage.getItem('boardDark')||'#4a4a4a';
 let defaultBorder=localStorage.getItem('boardBorder')||'transparent';
 
-// สถานะเกม
 let pieces=[];
 let selectedIndex=null;
 const boardEl=document.getElementById('board');
 const enemiesLeftEl=document.getElementById('enemiesLeft');
+const winsCountEl = document.getElementById('winsCount');
+const avgTimeEl = document.getElementById('avgTime');
 
-// ฟังก์ชันช่วย
+// --- Stats ---
+const WINS_KEY = 'chessTutor_wins_v1';
+const AVG_TIME_KEY = 'chessTutor_avgTime_v1';
+let wins = parseInt(localStorage.getItem(WINS_KEY)) || 0;
+let avgTime = parseFloat(localStorage.getItem(AVG_TIME_KEY)) || 0;
+let startTime = 0;
+
+function saveStats(){
+  localStorage.setItem(WINS_KEY, String(wins));
+  localStorage.setItem(AVG_TIME_KEY, String(avgTime));
+}
+function clearStats(){ wins=0; avgTime=0; saveStats(); updateHUD(); showToast('ล้างสถิติเรียบร้อย'); }
+
 function tileIndex(x,y){ return pieces.findIndex(p=>p.x===x && p.y===y); }
 function pathClear(p,tx,ty){ 
   const dx=tx-p.x,dy=ty-p.y;
@@ -158,8 +171,6 @@ function pathClear(p,tx,ty){
   }
   return true;
 }
-
-// กฎการเดิน
 function validMove(p,x,y){
   if(x<0||x>7||y<0||y>7) return false;
   if(p.x===x&&p.y===y) return false;
@@ -174,8 +185,6 @@ function validMove(p,x,y){
     default: return false;
   }
 }
-
-// สุ่มศัตรู
 function spawnEnemies(){
   const count=4+Math.floor(Math.random()*5);
   const possible=['pawn','rook','bishop','knight','queen'];
@@ -198,15 +207,14 @@ function spawnEnemies(){
   }
 }
 
-// เริ่มเกม
 function initGame(){
   pieces=[{x:4,y:4,type:myType,owner:'player'}];
   spawnEnemies();
   selectedIndex=null;
+  startTime = Date.now();
   draw(); updateHUD();
 }
 
-// วาดกระดาน
 function draw(){
   boardEl.innerHTML='';
   for(let y=0;y<8;y++){
@@ -231,7 +239,6 @@ function draw(){
   showHighlights();
 }
 
-// ไฮไลต์
 let highlighted=[];
 function showHighlights(){
   highlighted.forEach(t=>t.classList.remove('cyan')); highlighted=[];
@@ -243,7 +250,6 @@ function showHighlights(){
   });
 }
 
-// คลิกบนช่อง
 function onTileClick(x,y){
   const idx=tileIndex(x,y);
   if(idx!==-1 && pieces[idx].owner==='player'){
@@ -253,25 +259,35 @@ function onTileClick(x,y){
   if(selectedIndex!==null){
     const p=pieces[selectedIndex];
     if(validMove(p,x,y)){
-      // กินศัตรู
       if(idx!==-1 && pieces[idx].owner==='enemy') pieces.splice(idx,1);
       p.x=x; p.y=y; selectedIndex=null; draw(); updateHUD(); checkWin();
     }
   }
 }
 
-// HUD
-function updateHUD(){ enemiesLeftEl.textContent=pieces.filter(p=>p.owner==='enemy').length; }
+function updateHUD(){
+  enemiesLeftEl.textContent=pieces.filter(p=>p.owner==='enemy').length;
+  winsCountEl.textContent = wins;
+  avgTimeEl.textContent = avgTime.toFixed(1);
+}
 
-// เช็กชนะ
 function checkWin(){
   if(pieces.filter(p=>p.owner==='enemy').length===0){
+    let elapsed = (Date.now() - startTime)/1000;
+    avgTime = wins === 0 ? elapsed : (avgTime * wins + elapsed) / (wins + 1);
+    wins++;
+    saveStats();
+    updateHUD();
+    showToast(`ชนะ! เวลา: ${elapsed.toFixed(1)}s | ค่าเฉลี่ย: ${avgTime.toFixed(1)}s`);
     setTimeout(()=>{initGame();},300);
   }
 }
 
-// รีเซ็ต
 function resetGame(){ initGame(); }
+function showToast(text,ms=1600){
+  const d=document.createElement('div'); d.className='toast'; d.textContent=text; document.body.appendChild(d);
+  setTimeout(()=>{ d.style.transition='opacity 300ms'; d.style.opacity='0'; setTimeout(()=>d.remove(),300); },ms);
+}
 
 initGame();
 </script>
