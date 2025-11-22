@@ -175,7 +175,7 @@ function draw(){
       t.dataset.x = x; t.dataset.y = y;
       t.style.background = ((x+y)%2===0) ? (localStorage.getItem('boardLight') || '#f0f0f0') : (localStorage.getItem('boardDark') || '#4a4a4a');
       t.style.borderColor = localStorage.getItem('boardBorder') || 'transparent';
-      t.style.borderWidth = '2px'; // ขอบบางลง
+      t.style.borderWidth = '5px'; // ขอบบางลง
 
       const idx = tileIndex(x,y);
       if(idx !== -1){
@@ -283,4 +283,5 @@ window.addEventListener('focus', ()=>{
 </script>
 </body>
 </html>
+
 
